@@ -23,9 +23,9 @@ export function Verification() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center z-10">
-        <Link to="/seller/listings" className="p-2 -ml-2 active:bg-gray-100 rounded-lg">
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2 active:bg-gray-100 rounded-lg">
           <ArrowLeft className="w-6 h-6 text-gray-700" />
-        </Link>
+        </button>
         <h1 className="text-base font-semibold text-gray-900 ml-2">본인 소유 인증</h1>
       </div>
 
