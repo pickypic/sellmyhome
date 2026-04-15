@@ -1,15 +1,58 @@
 import { Link, useNavigate } from "react-router";
-import { User, FileText, Bell, Lock, HelpCircle, LogOut, ChevronRight, Settings } from "lucide-react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import {
+  User,
+  FileText,
+  Bell,
+  Lock,
+  HelpCircle,
+  LogOut,
+  ChevronRight,
+  Settings,
+} from "lucide-react";
+import { authStorage, propertiesApi, transactionsApi } from "@/api/client";
 
 export function SellerProfile() {
   const navigate = useNavigate();
+  const { user } = authStorage.get();
+
+  const [totalProperties, setTotalProperties] = useState<number | null>(null);
+  const [activeProperties, setActiveProperties] = useState<number | null>(null);
+  const [completedTx, setCompletedTx] = useState<number | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const [props, txs] = await Promise.all([
+          propertiesApi.getMySeller(),
+          transactionsApi.getMySeller(),
+        ]);
+        setTotalProperties(props.length);
+        setActiveProperties(
+          props.filter((p) =>
+            ["auction_open", "selection_pending", "matched"].includes(p.status)
+          ).length
+        );
+        setCompletedTx(txs.filter((t) => t.status === "completed").length);
+      } catch (e: any) {
+        // 통계 로드 실패는 무시 (화면에 "-" 표시)
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+    loadStats();
+  }, []);
 
   const handleLogout = () => {
-    // 로그아웃 처리
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("userType");
+    authStorage.clear();
     navigate("/", { replace: true });
   };
+
+  const displayName = user?.name ?? "사용자";
+  const displayEmail = user?.email ?? "";
+  const firstChar = displayName.charAt(0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -17,11 +60,24 @@ export function SellerProfile() {
       <div className="bg-white px-5 py-6 mb-2">
         <div className="flex items-center gap-4 mb-4">
           <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-            홍
+            {user?.profile_image ? (
+              <img
+                src={user.profile_image}
+                alt={displayName}
+                className="w-full h-full object-cover rounded-full"
+              />
+            ) : (
+              firstChar
+            )}
           </div>
           <div className="flex-1">
-            <h2 className="text-lg font-bold text-gray-900 mb-1">홍길동</h2>
-            <p className="text-sm text-gray-600">hong@example.com</p>
+            <h2 className="text-lg font-bold text-gray-900 mb-1">{displayName}</h2>
+            <p className="text-sm text-gray-600">{displayEmail}</p>
+            {user?.is_verified && (
+              <span className="inline-block mt-1 px-2 py-0.5 bg-green-50 text-green-600 text-xs font-semibold rounded">
+                인증 완료
+              </span>
+            )}
           </div>
           <Link
             to="/settings/profile-edit"
@@ -32,16 +88,31 @@ export function SellerProfile() {
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <Link to="/seller/listings" className="bg-gray-50 rounded-lg p-3 text-center active:bg-gray-100">
-            <div className="text-lg font-bold text-gray-900 mb-1">2</div>
+          <Link
+            to="/seller/listings"
+            className="bg-gray-50 rounded-lg p-3 text-center active:bg-gray-100"
+          >
+            <div className="text-lg font-bold text-gray-900 mb-1">
+              {statsLoading ? "-" : (totalProperties ?? 0)}
+            </div>
             <div className="text-xs text-gray-600">등록 매물</div>
           </Link>
-          <Link to="/seller/listings" className="bg-gray-50 rounded-lg p-3 text-center active:bg-gray-100">
-            <div className="text-lg font-bold text-blue-600 mb-1">1</div>
+          <Link
+            to="/seller/listings"
+            className="bg-gray-50 rounded-lg p-3 text-center active:bg-gray-100"
+          >
+            <div className="text-lg font-bold text-blue-600 mb-1">
+              {statsLoading ? "-" : (activeProperties ?? 0)}
+            </div>
             <div className="text-xs text-gray-600">진행중</div>
           </Link>
-          <Link to="/seller/transactions" className="bg-gray-50 rounded-lg p-3 text-center active:bg-gray-100">
-            <div className="text-lg font-bold text-green-600 mb-1">2</div>
+          <Link
+            to="/seller/transactions"
+            className="bg-gray-50 rounded-lg p-3 text-center active:bg-gray-100"
+          >
+            <div className="text-lg font-bold text-green-600 mb-1">
+              {statsLoading ? "-" : (completedTx ?? 0)}
+            </div>
             <div className="text-xs text-gray-600">완료</div>
           </Link>
         </div>
@@ -61,7 +132,7 @@ export function SellerProfile() {
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400" />
           </Link>
-          
+
           <Link
             to="/seller/verification"
             className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"
@@ -89,7 +160,7 @@ export function SellerProfile() {
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400" />
           </Link>
-          
+
           <Link
             to="/settings/security"
             className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"
@@ -128,7 +199,7 @@ export function SellerProfile() {
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400" />
           </Link>
-          
+
           <Link
             to="/terms"
             className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"
@@ -139,7 +210,7 @@ export function SellerProfile() {
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400" />
           </Link>
-          
+
           <Link
             to="/privacy"
             className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"
