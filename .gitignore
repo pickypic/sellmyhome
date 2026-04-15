@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment variables (절대 커밋하지 말 것)
+.env
+.env.local
+.env.production
+backend/.env
+frontend/.env.local
+
+# Build output
+dist/
+build/
+
+# NestJS
+backend/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/
