@@ -1,27 +1,65 @@
 import { useNavigate } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
+import { authStorage } from "@/api/client";
+import { toast } from "sonner";
+
+const STORAGE_KEY = "smh_notification_settings";
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { marketingConsent: false, pushNotification: true };
+}
 
 export function NotificationSettings() {
   const navigate = useNavigate();
-  const [marketingConsent, setMarketingConsent] = useState(false);
-  const [pushNotification, setPushNotification] = useState(true);
+  const { user } = authStorage.get();
+  const [settings, setSettings] = useState<{ marketingConsent: boolean; pushNotification: boolean }>(loadSettings);
 
   const handleBack = () => {
     navigate(-1);
+  };
+
+  const toggle = (key: "marketingConsent" | "pushNotification") => {
+    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleSave = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    toast.success("저장되었습니다.");
   };
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-10">
-        <div className="px-5 py-4 flex items-center gap-3">
-          <button onClick={handleBack} className="p-1 -ml-1">
-            <ArrowLeft className="w-5 h-5 text-foreground" />
+        <div className="px-5 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={handleBack} className="p-1 -ml-1">
+              <ArrowLeft className="w-5 h-5 text-foreground" />
+            </button>
+            <h1 className="text-lg font-bold text-foreground">알림 설정</h1>
+          </div>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            저장
           </button>
-          <h1 className="text-lg font-bold text-foreground">알림 설정</h1>
         </div>
       </header>
+
+      {/* User Info */}
+      {user && (
+        <div className="px-5 py-3 bg-card border-b border-border">
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{user.name}</span> ({user.email}) 님의 알림 설정
+          </p>
+        </div>
+      )}
 
       {/* Content */}
       <div className="bg-card mt-2">
@@ -31,18 +69,18 @@ export function NotificationSettings() {
             <div className="flex-1">
               <h3 className="font-bold text-foreground mb-1">마케팅 정보 수신</h3>
               <p className="text-sm text-muted-foreground">
-                2025.01.30
+                이벤트 및 프로모션 알림
               </p>
             </div>
             <button
-              onClick={() => setMarketingConsent(!marketingConsent)}
+              onClick={() => toggle("marketingConsent")}
               className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                marketingConsent ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
+                settings.marketingConsent ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
               }`}
             >
               <span
                 className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  marketingConsent ? "translate-x-7" : "translate-x-1"
+                  settings.marketingConsent ? "translate-x-7" : "translate-x-1"
                 }`}
               />
             </button>
@@ -62,14 +100,14 @@ export function NotificationSettings() {
               </p>
             </div>
             <button
-              onClick={() => setPushNotification(!pushNotification)}
+              onClick={() => toggle("pushNotification")}
               className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                pushNotification ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
+                settings.pushNotification ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
               }`}
             >
               <span
                 className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  pushNotification ? "translate-x-7" : "translate-x-1"
+                  settings.pushNotification ? "translate-x-7" : "translate-x-1"
                 }`}
               />
             </button>

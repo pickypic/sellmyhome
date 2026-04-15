@@ -1,67 +1,47 @@
 import { useNavigate } from "react-router";
 import { ArrowLeft, Camera, User } from "lucide-react";
 import { useState } from "react";
+import { authStorage, usersApi } from "@/api/client";
+import { toast } from "sonner";
 
 export function ProfileEdit() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(() => {
-    const userData = localStorage.getItem("user");
-    if (userData) {
-      return JSON.parse(userData);
-    }
-    // 기본 사용자 데이터 생성
-    const userType = localStorage.getItem("userType");
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    if (isLoggedIn) {
-      return {
-        nickname: "사용자",
-        email: "user@example.com",
-        userType: userType || "seller",
-        joinDate: "2025.01.15",
-        profileImage: ""
-      };
-    }
-    return null;
-  });
-  const [nickname, setNickname] = useState(user?.nickname || "");
-  const [profileImage, setProfileImage] = useState(user?.profileImage || "");
+  const { token, user: storedUser } = authStorage.get();
+  const [user, setUser] = useState(storedUser);
+  const [name, setName] = useState(storedUser?.name || "");
+  const [phone, setPhone] = useState(storedUser?.phone || "");
+  const [saving, setSaving] = useState(false);
 
   const handleBack = () => {
     navigate(-1);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSave = () => {
-    if (!nickname.trim()) {
-      alert("닉네임을 입력해주세요.");
+  const handleSave = async () => {
+    if (!name.trim()) {
+      toast.error("이름을 입력해주세요.");
       return;
     }
 
-    const updatedUser = {
-      ...user,
-      nickname: nickname.trim(),
-      profileImage: profileImage,
-    };
-
-    localStorage.setItem("user", JSON.stringify(updatedUser));
-    setUser(updatedUser);
-    
-    alert("프로필이 저장되었습니다.");
-    navigate(-1);
+    setSaving(true);
+    try {
+      const updatedUser = await usersApi.updateProfile({ name: name.trim(), phone: phone.trim() });
+      authStorage.save(token!, updatedUser);
+      setUser(updatedUser);
+      toast.success("프로필이 저장되었습니다.");
+      navigate(-1);
+    } catch (err: any) {
+      toast.error(err.message || "저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!user) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">로그인이 필요합니다.</p>
+      </div>
+    );
   }
 
   return (
@@ -77,9 +57,10 @@ export function ProfileEdit() {
           </div>
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={saving}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            저장
+            {saving ? "저장 중..." : "저장"}
           </button>
         </div>
       </header>
@@ -90,41 +71,43 @@ export function ProfileEdit() {
         <div className="flex flex-col items-center mb-8">
           <div className="relative mb-3">
             <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              {profileImage ? (
-                <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+              {user.profile_image ? (
+                <img src={user.profile_image} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <User className="w-12 h-12 text-white" />
               )}
             </div>
-            <label className="absolute bottom-0 right-0 w-8 h-8 bg-white dark:bg-gray-800 border-2 border-card rounded-full flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-lg">
-              <Camera className="w-4 h-4 text-foreground" />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-            </label>
+            <div className="absolute bottom-0 right-0 w-8 h-8 bg-white dark:bg-gray-800 border-2 border-card rounded-full flex items-center justify-center shadow-lg">
+              <Camera className="w-4 h-4 text-muted-foreground" />
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">프로필 사진 변경</p>
+          <p className="text-sm text-muted-foreground">프로필 사진 변경 (준비 중)</p>
         </div>
 
-        {/* Nickname Input */}
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <label className="block mb-3">
-            <span className="text-sm font-semibold text-foreground mb-2 block">닉네임</span>
+        {/* Name / Phone Input */}
+        <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
+          <label className="block">
+            <span className="text-sm font-semibold text-foreground mb-2 block">이름</span>
             <input
               type="text"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="닉네임을 입력하세요"
+              placeholder="이름을 입력하세요"
+              maxLength={30}
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-semibold text-foreground mb-2 block">전화번호</span>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="010-0000-0000"
               maxLength={20}
             />
           </label>
-          <p className="text-xs text-muted-foreground mt-2">
-            {nickname.length} / 20자
-          </p>
         </div>
 
         {/* Info */}
@@ -143,16 +126,12 @@ export function ProfileEdit() {
           <div className="space-y-3">
             <div className="flex justify-between py-2">
               <span className="text-sm text-muted-foreground">이메일</span>
-              <span className="text-sm text-foreground">{user.email || "user@example.com"}</span>
-            </div>
-            <div className="flex justify-between py-2">
-              <span className="text-sm text-muted-foreground">가입일</span>
-              <span className="text-sm text-foreground">{user.joinDate || "2025.01.15"}</span>
+              <span className="text-sm text-foreground">{user.email}</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-sm text-muted-foreground">계정 유형</span>
               <span className="text-sm text-foreground font-semibold text-blue-600">
-                {user.userType === "agent" ? "중개인" : "매도인"}
+                {user.role === "agent" ? "중개인" : "매도인"}
               </span>
             </div>
           </div>

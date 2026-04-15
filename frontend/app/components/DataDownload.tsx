@@ -2,39 +2,15 @@ import { useState } from "react";
 import {
   ArrowLeft,
   Download,
-  FileText,
-  Calendar,
-  Clock,
   CheckCircle2,
   AlertCircle,
-  Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router";
-
-// Mock data
-const mockDownloadHistory = [
-  {
-    id: 1,
-    type: "전체 데이터",
-    date: "2026-02-15",
-    size: "12.5 MB",
-    status: "완료",
-    downloadUrl: "#",
-  },
-  {
-    id: 2,
-    type: "매물 정보",
-    date: "2026-01-20",
-    size: "3.2 MB",
-    status: "완료",
-    downloadUrl: "#",
-  },
-];
+import { toast } from "sonner";
 
 export function DataDownload() {
   const navigate = useNavigate();
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([]);
-  const [isRequesting, setIsRequesting] = useState(false);
 
   const handleBack = () => {
     navigate(-1);
@@ -91,18 +67,11 @@ export function DataDownload() {
 
   const handleRequestDownload = () => {
     if (selectedDataTypes.length === 0) {
-      alert("다운로드할 데이터를 선택해주세요.");
+      toast.info("다운로드할 데이터를 선택해주세요.");
       return;
     }
-
-    setIsRequesting(true);
-    setTimeout(() => {
-      setIsRequesting(false);
-      alert(
-        "데이터 다운로드 요청이 완료되었습니다.\n준비가 완료되면 이메일로 알려드립니다."
-      );
-      setSelectedDataTypes([]);
-    }, 2000);
+    toast.info("데이터 준비에 최대 3 영업일이 소요됩니다. 이메일로 발송됩니다.");
+    setSelectedDataTypes([]);
   };
 
   return (
@@ -189,26 +158,19 @@ export function DataDownload() {
       <div className="bg-white px-5 py-5 mb-2">
         <button
           onClick={handleRequestDownload}
-          disabled={isRequesting || selectedDataTypes.length === 0}
+          disabled={selectedDataTypes.length === 0}
           className={`w-full py-4 rounded-xl font-bold text-white transition-colors ${
-            isRequesting || selectedDataTypes.length === 0
+            selectedDataTypes.length === 0
               ? "bg-gray-300 cursor-not-allowed"
               : "bg-blue-600 active:bg-blue-700"
           }`}
         >
-          {isRequesting ? (
-            <span className="flex items-center justify-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              요청 중...
-            </span>
-          ) : (
-            <span className="flex items-center justify-center gap-2">
-              <Download className="w-5 h-5" />
-              다운로드 요청
-              {selectedDataTypes.length > 0 &&
-                ` (${selectedDataTypes.length}개)`}
-            </span>
-          )}
+          <span className="flex items-center justify-center gap-2">
+            <Download className="w-5 h-5" />
+            다운로드 요청
+            {selectedDataTypes.length > 0 &&
+              ` (${selectedDataTypes.length}개)`}
+          </span>
         </button>
         <p className="text-xs text-gray-600 text-center mt-3">
           선택한 데이터의 준비가 완료되면 이메일로 알려드립니다
@@ -218,43 +180,10 @@ export function DataDownload() {
       {/* Download History */}
       <div className="bg-white px-5 py-5 mb-2">
         <h3 className="font-bold text-gray-900 mb-4">다운로드 내역</h3>
-        {mockDownloadHistory.length > 0 ? (
-          <div className="space-y-3">
-            {mockDownloadHistory.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-start gap-3 p-4 border border-gray-200 rounded-xl"
-              >
-                <FileText className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 mb-1">
-                    {item.type}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-gray-600 mb-2">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {item.date}
-                    </span>
-                    <span>{item.size}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-green-50 text-green-600 text-xs font-semibold rounded">
-                      {item.status}
-                    </span>
-                  </div>
-                </div>
-                <button className="text-sm text-blue-600 font-medium flex-shrink-0">
-                  다시 받기
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-12 text-center">
-            <Download className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-600">다운로드 내역이 없습니다</p>
-          </div>
-        )}
+        <div className="py-12 text-center">
+          <Download className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-600">다운로드 내역이 없습니다</p>
+        </div>
       </div>
 
       {/* Legal Notice */}

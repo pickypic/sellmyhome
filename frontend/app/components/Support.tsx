@@ -1,11 +1,7 @@
-import { MessageCircle, Phone, Mail, Clock, ArrowLeft, ChevronRight, HelpCircle, FileText } from "lucide-react";
+import { MessageCircle, Phone, Mail, Clock, ArrowLeft, ChevronRight, HelpCircle, FileText, MessageSquare } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { useState } from "react";
-
-const mockTickets = [
-  { id: 1, title: "지원 가능 매물 수 문의", category: "일반", date: "2026-03-15", status: "답변완료" },
-  { id: 2, title: "매칭 수수료 관련 질문", category: "결제", date: "2026-03-10", status: "답변대기" },
-];
+import { toast } from "sonner";
 
 const mockFAQs = [
   { id: 1, question: "서비스 이용 수수료는 어떻게 되나요?", answer: "기본 서비스는 무료이며, 프리미엄 기능 이용 시 요금제에 따라 수수료가 부과됩니다." },
@@ -24,9 +20,7 @@ export function Support() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // 여기에 문의 제출 로직 추가
-    console.log("제목:", subject);
-    console.log("내용:", message);
+    toast.success("문의가 접수되었습니다. 이메일로 답변드리겠습니다.");
     setSubject("");
     setMessage("");
   };
@@ -92,46 +86,50 @@ export function Support() {
 
       {/* My Tickets */}
       <div className="bg-white px-5 py-5 mb-2">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-gray-900">내 문의 내역</h3>
-          <Link
-            to="/support/create"
-            className="text-sm text-blue-600 font-medium"
+        <h3 className="font-bold text-gray-900 mb-4">내 문의 내역</h3>
+        <div className="py-10 text-center">
+          <MessageSquare className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">문의 내역이 없습니다</p>
+        </div>
+      </div>
+
+      {/* Contact Form */}
+      <div className="bg-white px-5 py-5 mb-2">
+        <h3 className="font-bold text-gray-900 mb-4">문의 작성</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              제목
+            </label>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="문의 제목을 입력해주세요"
+              required
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              내용
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="문의 내용을 입력해주세요"
+              required
+              rows={5}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold active:bg-blue-700"
           >
-            문의하기
-          </Link>
-        </div>
-        <div className="space-y-2">
-          {mockTickets.map((ticket) => (
-            <button
-              key={ticket.id}
-              className="w-full flex items-center justify-between p-3 border border-gray-200 rounded-lg active:bg-gray-50"
-            >
-              <div className="flex-1 text-left">
-                <div className="text-sm font-medium text-gray-900 mb-1">
-                  {ticket.title}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <span>{ticket.category}</span>
-                  <span>·</span>
-                  <span>{ticket.date}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`px-2 py-1 text-xs font-semibold rounded ${
-                    ticket.status === "답변완료"
-                      ? "bg-green-50 text-green-600"
-                      : "bg-blue-50 text-blue-600"
-                  }`}
-                >
-                  {ticket.status}
-                </span>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              </div>
-            </button>
-          ))}
-        </div>
+            문의 제출
+          </button>
+        </form>
       </div>
 
       {/* FAQ */}

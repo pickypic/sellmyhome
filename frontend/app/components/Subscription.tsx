@@ -1,6 +1,8 @@
-import { Crown, Check, ArrowLeft, CheckCircle2, Star } from "lucide-react";
+import { Crown, ArrowLeft, CheckCircle2, Star } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { authStorage } from "@/api/client";
+import { toast } from "sonner";
 
 const plans = [
   {
@@ -58,7 +60,8 @@ const plans = [
 
 export function Subscription() {
   const navigate = useNavigate();
-  const [activePlan, setActivePlan] = useState<"free" | "premium" | "pro">("free");
+  const { user } = authStorage.get();
+  const currentTier = (user?.subscription_tier ?? "free") as "free" | "premium" | "pro";
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
 
   const handleBack = () => {
@@ -66,7 +69,7 @@ export function Subscription() {
   };
 
   const handleSubscribe = () => {
-    alert(`${plans.find(p => p.id === activePlan)?.name} 플랜으로 구독됩니다!`);
+    toast.info("준비 중입니다");
   };
 
   return (
@@ -97,15 +100,15 @@ export function Subscription() {
             <div>
               <div className="text-sm text-blue-100 mb-1">현재 사용중</div>
               <div className="text-2xl font-bold">
-                {plans.find(p => p.id === activePlan)?.name}
+                {plans.find(p => p.id === currentTier)?.name}
               </div>
             </div>
-            {activePlan !== "free" && (
+            {currentTier !== "free" && (
               <Crown className="w-8 h-8 text-amber-300" />
             )}
           </div>
           <div className="text-sm text-blue-100">
-            {activePlan === "free" ? (
+            {currentTier === "free" ? (
               "언제든지 업그레이드 가능합니다"
             ) : (
               "다음 결제일: 2026-04-16"
@@ -148,7 +151,7 @@ export function Subscription() {
         {plans.map((plan) => {
           const yearlyPrice = Math.round(plan.price * 12 * 0.8);
           const displayPrice = billingPeriod === "yearly" ? yearlyPrice : plan.price;
-          const isCurrentPlan = activePlan === plan.id;
+          const isCurrentPlan = currentTier === plan.id;
 
           return (
             <div

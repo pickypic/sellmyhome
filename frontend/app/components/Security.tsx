@@ -4,43 +4,16 @@ import {
   Smartphone,
   Shield,
   Clock,
-  Monitor,
   ChevronRight,
   CheckCircle2,
   ArrowLeft,
 } from "lucide-react";
 import { useNavigate, Link } from "react-router";
-
-// Mock data
-const mockLoginHistory = [
-  {
-    id: 1,
-    device: "iPhone 14 Pro",
-    location: "서울, 대한민국",
-    ip: "121.162.xxx.xxx",
-    date: "2026-03-16 09:30",
-    current: true,
-  },
-  {
-    id: 2,
-    device: "Chrome on Windows",
-    location: "서울, 대한민국",
-    ip: "210.99.xxx.xxx",
-    date: "2026-03-15 14:20",
-    current: false,
-  },
-  {
-    id: 3,
-    device: "Safari on MacBook",
-    location: "서울, 대한민국",
-    ip: "175.223.xxx.xxx",
-    date: "2026-03-14 11:15",
-    current: false,
-  },
-];
+import { authStorage } from "@/api/client";
 
 export function Security() {
   const navigate = useNavigate();
+  const { user } = authStorage.get();
   const [autoLogoutEnabled, setAutoLogoutEnabled] = useState(false);
   const [autoLogoutTime, setAutoLogoutTime] = useState(30);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -49,23 +22,9 @@ export function Security() {
     navigate(-1);
   };
 
-  const handleChangePassword = () => {
-    alert("비밀번호가 변경되었습니다.");
-  };
-
-  const handle2FAToggle = () => {
-    setTwoFactorEnabled(!twoFactorEnabled);
-    alert(
-      "2단계 인증이 " +
-        (!twoFactorEnabled ? "활성화" : "비활성화") +
-        "되었습니다."
-    );
-  };
-
   const handleLogout = () => {
     if (confirm("로그아웃 하시겠습니까?")) {
-      localStorage.removeItem("isLoggedIn");
-      localStorage.removeItem("userType");
+      authStorage.clear();
       navigate("/login");
     }
   };
@@ -111,26 +70,40 @@ export function Security() {
         </p>
       </div>
 
+      {/* Account Info */}
+      <div className="bg-white px-5 py-5 mb-2">
+        <h3 className="font-bold text-gray-900 mb-4">현재 계정</h3>
+        <div className="space-y-3">
+          <div className="flex justify-between py-2 border-b border-gray-100">
+            <span className="text-sm text-gray-500">이메일</span>
+            <span className="text-sm text-gray-900">{user?.email || "-"}</span>
+          </div>
+          <div className="flex justify-between py-2">
+            <span className="text-sm text-gray-500">계정 유형</span>
+            <span className="text-sm font-semibold text-blue-600">
+              {user?.role === "agent" ? "중개인" : user?.role === "admin" ? "관리자" : "매도인"}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Password */}
       <div className="bg-white px-5 py-5 mb-2">
         <h3 className="font-bold text-gray-900 mb-4">비밀번호</h3>
-        <button
-          onClick={handleChangePassword}
-          className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-xl active:bg-gray-50"
-        >
+        <div className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-xl bg-gray-50">
           <div className="flex items-center gap-3">
-            <Lock className="w-5 h-5 text-gray-600" />
+            <Lock className="w-5 h-5 text-gray-400" />
             <div className="text-left">
-              <div className="font-medium text-gray-900 mb-0.5">
+              <div className="font-medium text-gray-500 mb-0.5">
                 비밀번호 변경
               </div>
-              <div className="text-xs text-gray-600">
-                마지막 변경: 2026-01-15
+              <div className="text-xs text-gray-400">
+                준비 중인 기능입니다
               </div>
             </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-gray-400" />
-        </button>
+          <ChevronRight className="w-5 h-5 text-gray-300" />
+        </div>
       </div>
 
       {/* Two-Factor Authentication */}
@@ -150,7 +123,7 @@ export function Security() {
               </div>
             </div>
             <button
-              onClick={handle2FAToggle}
+              onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
               className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
                 twoFactorEnabled ? "bg-blue-600" : "bg-gray-300"
               }`}
@@ -217,42 +190,6 @@ export function Security() {
               </select>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Login History */}
-      <div className="bg-white px-5 py-5 mb-2">
-        <h3 className="font-bold text-gray-900 mb-4">로그인 기록</h3>
-        <div className="space-y-3">
-          {mockLoginHistory.map((history) => (
-            <div
-              key={history.id}
-              className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg"
-            >
-              <Monitor className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-sm font-medium text-gray-900">
-                    {history.device}
-                  </span>
-                  {history.current && (
-                    <span className="px-2 py-0.5 bg-green-50 text-green-600 text-xs font-semibold rounded">
-                      현재
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-gray-600 mb-1">
-                  {history.location} · {history.ip}
-                </div>
-                <div className="text-xs text-gray-500">{history.date}</div>
-              </div>
-              {!history.current && (
-                <button className="text-xs text-red-600 font-medium hover:text-red-700 flex-shrink-0">
-                  로그아웃
-                </button>
-              )}
-            </div>
-          ))}
         </div>
       </div>
 
