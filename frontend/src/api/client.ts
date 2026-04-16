@@ -82,6 +82,33 @@ export const propertiesApi = {
     request<Transaction>(`/properties/${propertyId}/select-agent`, {
       method: 'POST', body: JSON.stringify({ bid_id: bidId }),
     }),
+
+  // 아파트 단지명 검색 (Kakao Local API 프록시)
+  searchApartment: (query: string) =>
+    request<ApartmentSearchResult[]>(`/properties/search/apartment?query=${encodeURIComponent(query)}`),
+
+  // 소유 인증 서류 업로드
+  uploadVerificationDoc: async (propertyId: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const token = localStorage.getItem('smh_token');
+    const res = await fetch(`${BASE_URL}/properties/${propertyId}/upload-doc`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: '업로드 실패' }));
+      throw new Error(err.message || '파일 업로드에 실패했습니다.');
+    }
+    return res.json() as Promise<{ path: string; url: string }>;
+  },
+
+  // 소유 인증 신청 제출
+  submitVerification: (propertyId: string, dto: { owner_name: string; owner_phone: string; doc_paths?: string[] }) =>
+    request<{ message: string; property_id: string }>(`/properties/${propertyId}/submit-verification`, {
+      method: 'POST', body: JSON.stringify(dto),
+    }),
 };
 
 // =============================================
@@ -227,6 +254,9 @@ export const authStorage = {
 export interface User {
   id: string; email: string; name: string; role: 'seller' | 'agent' | 'admin';
   phone?: string; profile_image?: string; is_verified: boolean; subscription_tier: string;
+}
+export interface ApartmentSearchResult {
+  id: string; name: string; address: string; jibun_address?: string; category?: string; x?: string; y?: string;
 }
 export interface Property {
   id: string; seller_id: string; apartment_name: string; address: string;

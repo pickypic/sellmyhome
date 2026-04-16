@@ -1,4 +1,8 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller, Get, Post, Patch, Body, Param, Query,
+  UseGuards, Request, UseInterceptors, UploadedFile,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PropertiesService } from './properties.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -28,6 +32,13 @@ export class PropertiesController {
     return this.propertiesService.findOpenAuctions(req.user.id);
   }
 
+  // ⚠️ ':id' 앞에 위치해야 함 — NestJS 라우트 우선순위
+  @Get('search/apartment')
+  @ApiOperation({ summary: '아파트 단지명 검색 (Kakao Local API 프록시)' })
+  searchApartment(@Query('query') query: string) {
+    return this.propertiesService.searchApartment(query ?? '');
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '매물 상세 조회' })
   findOne(@Param('id') id: string, @Request() req: any) {
@@ -48,5 +59,26 @@ export class PropertiesController {
     @Request() req: any,
   ) {
     return this.propertiesService.selectAgent(propertyId, dto.bid_id, req.user.id);
+  }
+
+  @Post(':id/upload-doc')
+  @ApiOperation({ summary: '소유 인증 서류 업로드 (매도자)' })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  uploadDoc(
+    @Param('id') id: string,
+    @Request() req: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.propertiesService.uploadVerificationDoc(id, req.user.id, file);
+  }
+
+  @Post(':id/submit-verification')
+  @ApiOperation({ summary: '소유 인증 신청 제출 (매도자)' })
+  submitVerification(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() dto: { owner_name: string; owner_phone: string; doc_paths?: string[] },
+  ) {
+    return this.propertiesService.submitVerification(id, req.user.id, dto);
   }
 }

@@ -8,10 +8,12 @@ export class PropertiesService {
   async create(sellerId: string, dto: {
     apartment_name: string;
     address: string;
+    address_road?: string;
     dong?: string;
     ho?: string;
     area: number;
     floor: number;
+    total_floors?: number;
     direction?: string;
     build_year?: number;
     asking_price: number;
@@ -44,7 +46,6 @@ export class PropertiesService {
 
   // ── 역경매 오픈 매물 목록 (중개사용) ─────────
   async findOpenAuctions(agentId: string) {
-    // 해당 중개사가 이미 입찰한 매물 제외
     const { data: myBids } = await supabaseClient
       .from('bids')
       .select('property_id')
@@ -77,7 +78,6 @@ export class PropertiesService {
 
     if (!property) throw new NotFoundException('매물을 찾을 수 없습니다.');
 
-    // 중개사는 경매 기간 중 다른 중개사 입찰 내용 비공개
     if (userRole === 'agent') {
       const { data: myBid } = await supabaseClient
         .from('bids')
@@ -88,7 +88,6 @@ export class PropertiesService {
       return { ...property, my_bid: myBid };
     }
 
-    // 매도자는 모든 입찰 열람 가능
     if (userRole === 'seller' && property.seller_id === userId) {
       const { data: bids } = await supabaseClient
         .from('bids')
@@ -114,7 +113,7 @@ export class PropertiesService {
     if (property.status !== 'verified') throw new ForbiddenException('소유 인증 후 경매를 시작할 수 있습니다.');
 
     const auctionEndAt = new Date();
-    auctionEndAt.setDate(auctionEndAt.getDate() + 3); // 3일 비공개 역경매
+    auctionEndAt.setDate(auctionEndAt.getDate() + 3);
 
     const { data } = await supabaseClient
       .from('properties')
@@ -137,20 +136,17 @@ export class PropertiesService {
     if (!property) throw new NotFoundException();
     if (property.seller_id !== sellerId) throw new ForbiddenException();
 
-    // 선택된 입찰 수락
     await supabaseClient
       .from('bids')
       .update({ status: 'accepted' })
       .eq('id', bidId);
 
-    // 나머지 입찰 거절
     await supabaseClient
       .from('bids')
       .update({ status: 'rejected' })
       .eq('property_id', propertyId)
       .neq('id', bidId);
 
-    // 매물 상태 변경
     const { data: bid } = await supabaseClient
       .from('bids')
       .select('agent_id, commission_rate')
@@ -162,7 +158,6 @@ export class PropertiesService {
       .update({ status: 'matched', selected_agent_id: bid.agent_id })
       .eq('id', propertyId);
 
-    // 거래 생성
     const { data: transaction } = await supabaseClient
       .from('transactions')
       .insert({
@@ -176,6 +171,127 @@ export class PropertiesService {
       .single();
 
     return transaction;
+  }
+
+  // ── 아파트 단지명 검색 (Kakao Local API 프록시) ─
+  async searchApartment(query: string): Promise<any[]> {
+    const key = process.env.KAKAO_REST_API_KEY;
+    if (!key || !query || query.trim().length < 2) return [];
+
+    try {
+      const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query + ' 아파트')}&size=10`;
+      const res = await fetch(url, {
+        headers: { Authorization: `KakaoAK ${key}` },
+      });
+      if (!res.ok) return [];
+      const json = (await res.json()) as any;
+      return (json.documents || [])
+        .slice(0, 8)
+        .map((d: any) => ({
+          id: d.id,
+          name: d.place_name,
+          address: d.road_address_name || d.address_name,
+          jibun_address: d.address_name,
+          category: d.category_name,
+          x: d.x,
+          y: d.y,
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  // ── 인증 서류 업로드 (Supabase Storage) ────────
+  async uploadVerificationDoc(
+    propertyId: string,
+    sellerId: string,
+    file: Express.Multer.File,
+  ) {
+    const { data: property } = await supabaseClient
+      .from('properties')
+      .select('id, seller_id')
+      .eq('id', propertyId)
+      .single();
+
+    if (!property) throw new NotFoundException('매물을 찾을 수 없습니다.');
+    if (property.seller_id !== sellerId) throw new ForbiddenException('권한이 없습니다.');
+
+    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9.\-_가-힣]/g, '_');
+    const filePath = `${propertyId}/${Date.now()}_${safeFileName}`;
+
+    const { data, error } = await supabaseClient.storage
+      .from('verification-docs')
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (error) throw new Error('파일 업로드에 실패했습니다: ' + error.message);
+
+    // verification-docs는 private 버킷 → signed URL 생성 (1시간)
+    const { data: signedData } = await supabaseClient.storage
+      .from('verification-docs')
+      .createSignedUrl(data.path, 3600);
+
+    return {
+      path: data.path,
+      url: signedData?.signedUrl ?? '',
+    };
+  }
+
+  // ── 소유 인증 신청 제출 ──────────────────────
+  async submitVerification(
+    propertyId: string,
+    sellerId: string,
+    dto: {
+      owner_name: string;
+      owner_phone: string;
+      doc_paths?: string[];
+    },
+  ) {
+    const { data: property } = await supabaseClient
+      .from('properties')
+      .select('id, seller_id, apartment_name, address, status')
+      .eq('id', propertyId)
+      .single();
+
+    if (!property) throw new NotFoundException('매물을 찾을 수 없습니다.');
+    if (property.seller_id !== sellerId) throw new ForbiddenException('권한이 없습니다.');
+
+    // 이미 인증됐거나 진행중인 경우
+    if (!['pending_verification'].includes(property.status)) {
+      throw new ForbiddenException('이미 인증이 완료되었거나 진행 중인 매물입니다.');
+    }
+
+    // 서류 경로 저장
+    if (dto.doc_paths?.length) {
+      await supabaseClient
+        .from('properties')
+        .update({ documents: dto.doc_paths })
+        .eq('id', propertyId);
+    }
+
+    // 어드민 전체에게 알림
+    const { data: admins } = await supabaseClient
+      .from('users')
+      .select('id')
+      .eq('role', 'admin');
+
+    for (const admin of admins || []) {
+      await supabaseClient.from('notifications').insert({
+        user_id: admin.id,
+        type: 'verification_request',
+        title: '📋 소유 인증 신청',
+        body: `${dto.owner_name}(${dto.owner_phone})님이 [${property.apartment_name}] 소유 인증을 신청했습니다.`,
+        data: { property_id: propertyId, apartment_name: property.apartment_name },
+        is_read: false,
+      });
+    }
+
+    return {
+      message: '소유 인증 서류가 제출되었습니다. 1-2 영업일 내에 처리됩니다.',
+      property_id: propertyId,
+    };
   }
 
   // ── 스케줄러: 만료된 경매 자동 마감 (매시간) ─
@@ -195,7 +311,6 @@ export class PropertiesService {
         .select('*', { count: 'exact', head: true })
         .eq('property_id', property.id);
 
-      // 입찰 없으면 재경매 대기, 있으면 선택 대기로
       const newStatus = (count || 0) > 0 ? 'selection_pending' : 'no_bids';
       await supabaseClient
         .from('properties')
