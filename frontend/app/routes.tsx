@@ -103,6 +103,10 @@ export const router = createBrowserRouter([
       { path: "agent/points", Component: PointsDashboard },
       { path: "agent/points/purchase", Component: PurchasePoints },
       { path: "agent/points/history", Component: PointsHistory },
+
+      // Points routes (Seller)
+      { path: "seller/points", Component: PointsDashboard },
+      { path: "seller/points/history", Component: PointsHistory },
       
       // Trust & Reports
       { path: "trust-center", Component: TrustCenter },

@@ -133,6 +133,17 @@ export class AdminService {
       balance: newBalance,
     });
 
+    // 포인트 지급/차감 알림 생성
+    const isGrant = dto.amount > 0;
+    await supabaseClient.from('notifications').insert({
+      user_id: userId,
+      type: 'point_grant',
+      title: isGrant ? `포인트 ${dto.amount.toLocaleString()}P 지급` : `포인트 ${Math.abs(dto.amount).toLocaleString()}P 차감`,
+      body: `사유: ${dto.reason} | 현재 잔액: ${newBalance.toLocaleString()}P`,
+      data: { amount: dto.amount, balance: newBalance, reason: dto.reason },
+      is_read: false,
+    });
+
     return { message: '포인트가 조정되었습니다.', new_balance: newBalance };
   }
 

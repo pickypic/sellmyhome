@@ -1,11 +1,15 @@
-import { Coins, Plus, TrendingUp, ArrowLeft, Zap, Gift, Award, ChevronRight } from "lucide-react";
-import { Link, useNavigate } from "react-router";
+import { TrendingUp, ArrowLeft, Zap, Gift, Award, ChevronRight } from "lucide-react";
+import { Link, useNavigate, useLocation } from "react-router";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { pointsApi, PointTransaction } from "@/api/client";
 
 export function PointsDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // 현재 경로 기반으로 포인트 기본 경로 결정 (seller / agent)
+  const basePath = location.pathname.startsWith("/seller") ? "/seller/points" : "/agent/points";
+
   const [balance, setBalance] = useState(0);
   const [history, setHistory] = useState<PointTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,12 +52,14 @@ export function PointsDashboard() {
         <div className="text-4xl font-bold mb-6">
           {loading ? "..." : balance.toLocaleString()} P
         </div>
-        <Link
-          to="/agent/points/purchase"
-          className="block w-full py-3 bg-white text-blue-600 rounded-xl text-center font-semibold active:bg-blue-50"
-        >
-          포인트 충전하기
-        </Link>
+        {basePath === "/agent/points" && (
+          <Link
+            to="/agent/points/purchase"
+            className="block w-full py-3 bg-white text-blue-600 rounded-xl text-center font-semibold active:bg-blue-50"
+          >
+            포인트 충전하기
+          </Link>
+        )}
       </div>
 
       {/* Stats */}
@@ -101,7 +107,7 @@ export function PointsDashboard() {
       <div className="bg-white px-5 py-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-gray-900">최근 내역</h3>
-          <Link to="/agent/points/history" className="text-sm text-blue-600 font-medium flex items-center gap-1">
+          <Link to={`${basePath}/history`} className="text-sm text-blue-600 font-medium flex items-center gap-1">
             전체보기
             <ChevronRight className="w-4 h-4" />
           </Link>
