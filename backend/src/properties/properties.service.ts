@@ -294,6 +294,140 @@ export class PropertiesService {
     };
   }
 
+  // ── 건축물대장 API 소유권 자동 확인 ──────────────
+  async checkOwnership(propertyId: string, userId: string): Promise<{
+    verified: boolean;
+    auto: boolean;
+    reason?: string;
+    building_info?: { owner_name?: string; build_year?: string; area?: string; building_name?: string };
+  }> {
+    // 1. 매물 및 사용자 정보 조회
+    const { data: property } = await supabaseClient
+      .from('properties')
+      .select('id, seller_id, apartment_name, address, address_road, dong, ho, status')
+      .eq('id', propertyId)
+      .single();
+
+    if (!property) throw new NotFoundException('매물을 찾을 수 없습니다.');
+    if (property.seller_id !== userId) throw new ForbiddenException('권한이 없습니다.');
+
+    if (property.status === 'verified') {
+      return { verified: true, auto: false, reason: '이미 인증된 매물입니다.' };
+    }
+
+    const { data: user } = await supabaseClient
+      .from('users')
+      .select('name')
+      .eq('id', userId)
+      .single();
+
+    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+
+    const serviceKey = process.env.PUBLIC_DATA_API_KEY;
+    if (!serviceKey) {
+      return { verified: false, auto: false, reason: '자동 인증 서비스를 사용할 수 없습니다. 서류를 직접 제출해주세요.' };
+    }
+
+    // 2. 주소 준비 (지번주소 우선, 없으면 도로명)
+    const address = property.address || property.address_road || '';
+    if (!address) {
+      return { verified: false, auto: false, reason: '주소 정보가 없습니다.' };
+    }
+
+    try {
+      // 3. 건축물대장 API 호출
+      const apiUrl = `https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo` +
+        `?serviceKey=${serviceKey}` +
+        `&platPlc=${encodeURIComponent(address)}` +
+        `&numOfRows=10&pageNo=1&_type=json`;
+
+      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) {
+        return { verified: false, auto: false, reason: '건축물대장 조회 서비스에 일시적으로 접근할 수 없습니다.' };
+      }
+
+      const json = (await res.json()) as any;
+      const rawItems = json?.response?.body?.items?.item;
+
+      if (!rawItems) {
+        return {
+          verified: false,
+          auto: false,
+          reason: '해당 주소의 건축물대장 정보를 찾을 수 없습니다. 주소를 확인하거나 서류를 직접 제출해주세요.',
+        };
+      }
+
+      const items: any[] = Array.isArray(rawItems) ? rawItems : [rawItems];
+
+      // 4. 소유자명 추출 (ownerNm 필드)
+      const ownerNames: string[] = items
+        .map((it: any) => (it.ownerNm ?? '').trim())
+        .filter((n: string) => n.length > 0);
+
+      // 건물 기본 정보 추출 (최초 항목 기준)
+      const first = items[0];
+      const buildingInfo = {
+        owner_name: ownerNames[0],
+        build_year: first?.useAprDay ? String(first.useAprDay).slice(0, 4) : undefined,
+        area: first?.totArea ? String(first.totArea) : undefined,
+        building_name: first?.bldNm || property.apartment_name,
+      };
+
+      // 5. 이름 비교 (공백 제거 후 비교)
+      const userName = user.name.replace(/\s/g, '');
+      const matched = ownerNames.some(
+        (name) => name.replace(/\s/g, '') === userName,
+      );
+
+      if (matched) {
+        // 자동 인증 성공 → 상태 변경
+        await supabaseClient
+          .from('properties')
+          .update({ status: 'verified' })
+          .eq('id', propertyId);
+
+        // 알림: 어드민에게 자동 인증 완료 통보
+        const { data: admins } = await supabaseClient
+          .from('users').select('id').eq('role', 'admin');
+        for (const admin of admins || []) {
+          await supabaseClient.from('notifications').insert({
+            user_id: admin.id,
+            type: 'verification_auto',
+            title: '✅ 자동 소유 인증 완료',
+            body: `${user.name}님의 [${property.apartment_name}] 건축물대장 자동 인증이 완료되었습니다.`,
+            data: { property_id: propertyId },
+            is_read: false,
+          });
+        }
+
+        return { verified: true, auto: true, building_info: buildingInfo };
+      }
+
+      // 6. 소유자 없거나 이름 불일치
+      if (ownerNames.length === 0) {
+        return {
+          verified: false,
+          auto: false,
+          building_info: buildingInfo,
+          reason: '건축물대장에서 소유자 정보를 확인할 수 없습니다 (아파트 집합건물의 경우 호별 소유자는 등기부등본으로만 확인됩니다). 서류를 직접 제출해주세요.',
+        };
+      }
+
+      return {
+        verified: false,
+        auto: false,
+        building_info: buildingInfo,
+        reason: `건축물대장 소유자(${ownerNames.join(', ')})와 회원 이름(${user.name})이 일치하지 않습니다. 이름 변경이나 공동 소유의 경우 서류를 제출해주세요.`,
+      };
+    } catch (err: any) {
+      if (err.name === 'TimeoutError') {
+        return { verified: false, auto: false, reason: '건축물대장 조회 서비스 응답 시간이 초과되었습니다. 잠시 후 다시 시도하거나 서류를 제출해주세요.' };
+      }
+      console.error('[건축물대장 API 오류]', err?.message);
+      return { verified: false, auto: false, reason: '자동 인증 중 오류가 발생했습니다. 서류를 직접 제출해주세요.' };
+    }
+  }
+
   // ── 스케줄러: 만료된 경매 자동 마감 (매시간) ─
   @Cron(CronExpression.EVERY_HOUR)
   async closeExpiredAuctions() {

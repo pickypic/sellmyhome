@@ -45,6 +45,12 @@ export class PropertiesController {
     return this.propertiesService.findOne(id, req.user.id, req.user.role);
   }
 
+  @Get(':id/check-ownership')
+  @ApiOperation({ summary: '건축물대장 기반 소유권 자동 확인 (공공데이터포털)' })
+  checkOwnership(@Param('id') id: string, @Request() req: any) {
+    return this.propertiesService.checkOwnership(id, req.user.id);
+  }
+
   @Patch(':id/start-auction')
   @ApiOperation({ summary: '역경매 시작 (매도자)' })
   startAuction(@Param('id') id: string, @Request() req: any) {

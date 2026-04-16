@@ -109,6 +109,15 @@ export const propertiesApi = {
     request<{ message: string; property_id: string }>(`/properties/${propertyId}/submit-verification`, {
       method: 'POST', body: JSON.stringify(dto),
     }),
+
+  // 건축물대장 기반 자동 소유권 확인 (공공데이터포털)
+  checkOwnership: (propertyId: string) =>
+    request<{
+      verified: boolean;
+      auto: boolean;
+      reason?: string;
+      building_info?: { owner_name?: string; build_year?: string; area?: string; building_name?: string };
+    }>(`/properties/${propertyId}/check-ownership`),
 };
 
 // =============================================
